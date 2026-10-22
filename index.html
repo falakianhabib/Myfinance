@@ -1,0 +1,346 @@
+<!DOCTYPE html>
+<html lang="fa" dir="rtl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>مدیریت مالی شخصی و اقساط</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.rtl.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.1/font/bootstrap-icons.css">
+    <style>
+        :root {
+            --primary-color: #0f172a;
+            --accent-color: #2563eb;
+            --bg-color: #f8fafc;
+        }
+        body { font-family: 'Vazirmatn', Tahoma, sans-serif; background-color: var(--bg-color); color: #334155; }
+        .card-custom { border-radius: 16px; border: 1px solid #e2e8f0; background: #ffffff; box-shadow: 0 4px 12px rgba(0,0,0,0.03); transition: all 0.2s ease; }
+        .nav-pills .nav-link { color: #64748b; font-weight: 600; border-radius: 10px; padding: 10px 20px; }
+        .nav-pills .nav-link.active { background-color: var(--accent-color); color: #ffffff; }
+        .auth-container { max-width: 440px; margin: 80px auto; }
+        .stat-card { border-radius: 16px; padding: 20px; color: white; position: relative; overflow: hidden; }
+        .stat-card .stat-icon { position: absolute; left: -10px; bottom: -10px; font-size: 5rem; opacity: 0.15; }
+        
+        .inst-box { border-radius: 12px; border: 2px solid #e2e8f0; padding: 14px; background: #fff; transition: transform 0.15s, box-shadow 0.15s; }
+        .inst-box:hover { transform: translateY(-3px); box-shadow: 0 6px 15px rgba(0,0,0,0.08); }
+        
+        .inst-box.status-paid { background-color: #f0fdf4; border-color: #22c55e; }
+        .inst-box.status-current { background-color: #f0f9ff; border-color: #0284c7; }
+        .inst-box.status-overdue { background-color: #fef2f2; border-color: #ef4444; }
+
+        .status-badge-paid { background-color: #16a34a; color: white; }
+        .status-badge-current { background-color: #0284c7; color: white; }
+        .status-badge-overdue { background-color: #dc2626; color: white; }
+
+        .print-area { background: #fff; padding: 20px; border-radius: 12px; }
+    </style>
+</head>
+<body>
+
+    <!-- Auth View -->
+    <div id="authScreen" class="container auth-container">
+        <div class="card card-custom p-4 shadow-lg">
+            <div class="text-center mb-4">
+                <div class="p-3 bg-primary bg-opacity-10 text-primary d-inline-block rounded-circle mb-2">
+                    <i class="bi bi-shield-lock fs-2"></i>
+                </div>
+                <h4 class="fw-bold text-dark">ورود به سامانه مالی</h4>
+                <p class="text-muted small">مدیریت هوشمند درآمدها، وام‌ها و اقساط</p>
+            </div>
+
+            <form id="loginForm">
+                <div class="mb-3">
+                    <label class="form-label fw-bold small">نام کاربری</label>
+                    <input type="text" id="authUsername" class="form-control form-control-lg" placeholder="نام کاربری خود را وارد کنید" required>
+                </div>
+                <div class="mb-3">
+                    <label class="form-label fw-bold small">رمز عبور</label>
+                    <input type="password" id="authPassword" class="form-control form-control-lg" placeholder="رمز عبور" required>
+                </div>
+                <div class="form-check mb-4">
+                    <input class="form-check-input" type="checkbox" id="rememberMe">
+                    <label class="form-check-label small" for="rememberMe">
+                        ذخیره ورود روی این دستگاه
+                    </label>
+                </div>
+                <button type="submit" class="btn btn-primary btn-lg w-100 fw-bold fs-6">ورود / ثبت نام</button>
+            </form>
+        </div>
+    </div>
+
+    <!-- Main App View -->
+    <div id="mainApp" class="container py-4 d-none">
+        
+        <!-- Header / User Navbar -->
+        <div class="d-flex justify-content-between align-items-center mb-4 pb-3 border-bottom">
+            <div class="d-flex align-items-center gap-3">
+                <div class="p-2 bg-primary text-white rounded-3">
+                    <i class="bi bi-wallet2 fs-4"></i>
+                </div>
+                <div>
+                    <h4 class="fw-bold mb-0 text-dark">مدیریت مالی شخصی</h4>
+                    <small class="text-muted">حساب فعال: <span id="currentUserDisplay" class="fw-bold text-primary"></span></small>
+                </div>
+            </div>
+            <div class="d-flex align-items-center gap-2">
+                <!-- Simple Backup & Restore Buttons -->
+                <button class="btn btn-outline-primary btn-sm" onclick="downloadBackup()"><i class="bi bi-download me-1"></i> دانلود پشتیبان (ذخیره)</button>
+                <button class="btn btn-outline-success btn-sm" onclick="triggerRestore()"><i class="bi bi-upload me-1"></i> بازیابی پشتیبان</button>
+                <input type="file" id="restoreFileInput" style="display:none;" accept=".json" onchange="handleRestoreFile(event)">
+                <button id="btnLogout" class="btn btn-outline-secondary btn-sm ms-2"><i class="bi bi-power"></i> خروج</button>
+            </div>
+        </div>
+
+        <!-- Dashboard Stat Cards -->
+        <div class="row g-3 mb-4">
+            <div class="col-md-4">
+                <div class="stat-card bg-success">
+                    <div class="fs-6 opacity-75">مجموع کل درآمدها</div>
+                    <div class="fs-3 fw-bold mt-2" id="dashTotalIncome">0 ریال</div>
+                    <i class="bi bi-arrow-down-left-circle stat-icon"></i>
+                </div>
+            </div>
+            <div class="col-md-4">
+                <div class="stat-card bg-danger">
+                    <div class="fs-6 opacity-75">مجموع مانده اقساط پرداختی نشده</div>
+                    <div class="fs-3 fw-bold mt-2" id="dashTotalLoans">0 ریال</div>
+                    <i class="bi bi-bank stat-icon"></i>
+                </div>
+            </div>
+            <div class="col-md-4">
+                <div class="stat-card bg-info">
+                    <div class="fs-6 opacity-75">خالص دارایی (موجود در دسترس)</div>
+                    <div class="fs-3 fw-bold mt-2" id="dashNetBalance">0 ریال</div>
+                    <i class="bi bi-cash-stack stat-icon"></i>
+                </div>
+            </div>
+        </div>
+
+        <!-- Tab Navigation -->
+        <ul class="nav nav-pills mb-4" id="mainTabs" role="tablist">
+            <li class="nav-item">
+                <button class="nav-link active" id="incomes-tab" data-bs-toggle="pill" data-bs-target="#incomes" type="button"><i class="bi bi-cash me-2"></i>درآمدها و دریافتی‌ها</button>
+            </li>
+            <li class="nav-item">
+                <button class="nav-link" id="loans-tab" data-bs-toggle="pill" data-bs-target="#loans" type="button"><i class="bi bi-credit-card me-2"></i>مدیریت وام‌ها و اقساط</button>
+            </li>
+            <li class="nav-item">
+                <button class="nav-link" id="reports-tab" data-bs-toggle="pill" data-bs-target="#reports" type="button"><i class="bi bi-pie-chart me-2"></i>گزارشات و خروجی PDF/تصویر</button>
+            </li>
+        </ul>
+
+        <div class="tab-content" id="mainTabsContent">
+            
+            <!-- Incomes Tab -->
+            <div class="tab-pane fade show active" id="incomes">
+                <div class="card card-custom p-4 mb-4">
+                    <h6 class="fw-bold mb-3"><i class="bi bi-plus-circle me-2 text-primary"></i>ثبت یا ویرایش درآمد</h6>
+                    <form id="incomeForm" class="row g-3">
+                        <input type="hidden" id="incEditId" value="">
+                        <div class="col-md-4">
+                            <label class="form-label small fw-bold">عنوان درآمد</label>
+                            <input type="text" id="incTitle" class="form-control" placeholder="مثلا حقوق، پاداش..." required>
+                        </div>
+                        <div class="col-md-4">
+                            <label class="form-label small fw-bold">مبلغ (ریال)</label>
+                            <input type="text" id="incAmount" class="form-control" placeholder="مبلغ ریالی" required>
+                        </div>
+                        <div class="col-md-4">
+                            <label class="form-label small fw-bold">تاریخ دریافتی</label>
+                            <input type="text" id="incDate" class="form-control" placeholder="1403/01/15" required>
+                        </div>
+                        <div class="col-12 text-end">
+                            <button type="submit" id="btnIncSave" class="btn btn-success px-4"><i class="bi bi-check-lg me-1"></i>ذخیره درآمد</button>
+                        </div>
+                    </form>
+                </div>
+
+                <div class="card card-custom p-3">
+                    <div class="table-responsive">
+                        <table class="table table-hover align-middle mb-0">
+                            <thead class="table-light">
+                                <tr>
+                                    <th>عنوان درآمد</th>
+                                    <th>مبلغ (ریال)</th>
+                                    <th>تاریخ</th>
+                                    <th class="text-center">عملیات</th>
+                                </tr>
+                            </thead>
+                            <tbody id="incomeTableBody"></tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Loans Tab -->
+            <div class="tab-pane fade" id="loans">
+                <div class="card card-custom p-4 mb-4">
+                    <h6 class="fw-bold mb-3"><i class="bi bi-plus-circle me-2 text-danger"></i>ثبت یا ویرایش وام جدید</h6>
+                    <form id="loanForm" class="row g-3">
+                        <input type="hidden" id="loanEditId" value="">
+                        <div class="col-md-3">
+                            <label class="form-label small fw-bold">عنوان وام</label>
+                            <input type="text" id="loanTitle" class="form-control" placeholder="مثلا وام مسکن" required>
+                        </div>
+                        <div class="col-md-3">
+                            <label class="form-label small fw-bold">مبلغ کل وام (ریال)</label>
+                            <input type="text" id="loanTotal" class="form-control" placeholder="مبلغ کل" required>
+                        </div>
+                        <div class="col-md-3">
+                            <label class="form-label small fw-bold">تاریخ دریافت وام</label>
+                            <input type="text" id="loanReceiveDate" class="form-control" placeholder="1403/01/01" required>
+                        </div>
+                        <div class="col-md-3">
+                            <label class="form-label small fw-bold">تاریخ شروع اولین قسط</label>
+                            <input type="text" id="loanFirstDueDate" class="form-control" placeholder="1403/02/01" required>
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label small fw-bold">تعداد اقساط</label>
+                            <input type="number" id="loanInstallmentCount" class="form-control" placeholder="مثلا 12" required>
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label small fw-bold">مبلغ هر قسط (ریال)</label>
+                            <input type="text" id="loanInstallmentAmount" class="form-control" placeholder="مبلغ قسط" required>
+                        </div>
+                        <div class="col-12 text-end">
+                            <button type="submit" id="btnLoanSave" class="btn btn-danger px-4"><i class="bi bi-check-lg me-1"></i>ذخیره مشخصات وام</button>
+                        </div>
+                    </form>
+                </div>
+
+                <!-- Dynamic Installments View with Status Legend -->
+                <div class="card card-custom p-4">
+                    <!-- Color Status Legend -->
+                    <div class="d-flex flex-wrap gap-3 mb-4 p-3 bg-light rounded-3 align-items-center">
+                        <span class="fw-bold small text-secondary"><i class="bi bi-palette me-1"></i>راهنمای وضعیت اقساط:</span>
+                        <span class="badge status-badge-paid px-3 py-2"><i class="bi bi-check-circle me-1"></i>سبز: پرداخت شده</span>
+                        <span class="badge status-badge-current px-3 py-2"><i class="bi bi-clock-history me-1"></i>آبی: جاری (موعد این ماه یا آینده)</span>
+                        <span class="badge status-badge-overdue px-3 py-2"><i class="bi bi-exclamation-triangle me-1"></i>قرمز: معوق (سررسید گذشته)</span>
+                    </div>
+
+                    <div class="row align-items-center mb-4 pb-3 border-bottom">
+                        <div class="col-md-6">
+                            <label class="form-label fw-bold text-primary mb-1"><i class="bi bi-funnel me-1"></i>انتخاب وام برای مشاهده و پرداخت اقساط:</label>
+                            <select id="loanSelectDropdown" class="form-select form-select-lg border-primary">
+                                <option value="">-- هیچ وامی انتخاب نشده است --</option>
+                            </select>
+                        </div>
+                        <div class="col-md-6 text-md-end mt-3 mt-md-0" id="selectedLoanActions">
+                            <!-- Loan Action Buttons rendered dynamically -->
+                        </div>
+                    </div>
+
+                    <!-- Installments Container -->
+                    <div id="installmentsDisplayArea">
+                        <div class="text-center py-5 text-muted">
+                            <i class="bi bi-arrow-up-circle fs-1 opacity-25"></i>
+                            <p class="mt-2">لطفاً از منوی بالا یک وام را انتخاب کنید تا لیست اقساط آن نمایش داده شود.</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Reports Tab -->
+            <div class="tab-pane fade" id="reports">
+                <div class="d-flex justify-content-between align-items-center mb-3">
+                    <h5 class="fw-bold mb-0"><i class="bi bi-file-earmark-bar-graph me-2"></i>گزارش‌گیری و خروجی</h5>
+                    <div>
+                        <button class="btn btn-outline-danger me-2" onclick="exportToPDF()"><i class="bi bi-file-earmark-pdf me-1"></i> خروجی PDF (پرینت)</button>
+                        <button class="btn btn-outline-success" onclick="exportToImage()"><i class="bi bi-file-earmark-image me-1"></i> خروجی تصویر (PNG)</button>
+                    </div>
+                </div>
+
+                <div id="exportReportArea" class="print-area card card-custom">
+                    <div class="text-center mb-4 pb-3 border-bottom">
+                        <h4 class="fw-bold">گزارش جامع وضعیت مالی و اقساط</h4>
+                        <small class="text-muted">تاریخ گزارش: <span id="reportGeneratedDate"></span> | کاربر: <span id="reportUser"></span></small>
+                    </div>
+
+                    <div class="row text-center g-3 mb-4">
+                        <div class="col-4">
+                            <div class="p-3 border rounded bg-light">
+                                <small class="text-muted">کل درآمدها</small>
+                                <div id="reportTotalInc" class="fw-bold text-success fs-5">0 ریال</div>
+                            </div>
+                        </div>
+                        <div class="col-4">
+                            <div class="p-3 border rounded bg-light">
+                                <small class="text-muted">مانده کل اقساط</small>
+                                <div id="reportTotalRem" class="fw-bold text-danger fs-5">0 ریال</div>
+                            </div>
+                        </div>
+                        <div class="col-4">
+                            <div class="p-3 border rounded bg-light">
+                                <small class="text-muted">درصد پیشرفت پرداخت</small>
+                                <div id="reportRatio" class="fw-bold text-primary fs-5">0%</div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="mb-4">
+                        <h6 class="fw-bold border-bottom pb-2">جدول وضعیت وام‌ها و سررسیدها</h6>
+                        <div class="table-responsive">
+                            <table class="table table-bordered table-striped align-middle small">
+                                <thead>
+                                    <tr>
+                                        <th>نام وام</th>
+                                        <th>تاریخ دریافت</th>
+                                        <th>شروع قسط</th>
+                                        <th>مبلغ کل</th>
+                                        <th>اقساط (پرداخت/کل)</th>
+                                        <th>مانده (ریال)</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="reportLoanTable"></tbody>
+                            </table>
+                        </div>
+                    </div>
+
+                    <div>
+                        <h6 class="fw-bold border-bottom pb-2">نمودار مقایسه درآمد و بدهی اقساط</h6>
+                        <canvas id="financeChart" height="90"></canvas>
+                    </div>
+                </div>
+            </div>
+
+        </div>
+    </div>
+
+    <!-- Edit Installment Modal -->
+    <div class="modal fade" id="editInstallmentModal" tabindex="-1" aria-hidden="true">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title fw-bold">ویرایش قسط و سررسید</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body">
+                    <input type="hidden" id="editInstLoanId">
+                    <input type="hidden" id="editInstIndex">
+                    <div class="mb-3">
+                        <label class="form-label small fw-bold">مبلغ قسط (ریال)</label>
+                        <input type="text" id="editInstAmount" class="form-control" required>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label small fw-bold">تاریخ سررسید قسط</label>
+                        <input type="text" id="editInstDueDate" class="form-control" placeholder="1403/02/01">
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label small fw-bold">تاریخ واریز / پرداخت قسط (در صورت پرداخت)</label>
+                        <input type="text" id="editInstPayDate" class="form-control" placeholder="1403/02/05">
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">انصراف</button>
+                    <button type="button" class="btn btn-primary" onclick="saveInstallmentEdit()">ذخیره تغییرات</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Scripts -->
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+    <script src="js/app.js"></script>
+</body>
+</html>
