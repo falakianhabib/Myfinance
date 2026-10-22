@@ -1,0 +1,14 @@
+{
+  "name": "personal-finance-app",
+  "version": "2.2.0",
+  "description": "Professional Personal Finance Manager with Easy JSON Backup & Restore",
+  "main": "electron/main.js",
+  "scripts": {
+    "start": "electron .",
+    "build:win": "electron-builder --win nsis"
+  },
+  "dependencies": {
+    "@capacitor/android": "^5.0.0",
+    "@capacitor/core": "^5.0.0"
+  }
+}
